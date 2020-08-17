@@ -74,7 +74,8 @@ def Get_LineOfSight_UnitVector(RA, DE):
     #                      [np.cos(DE) * np.sin(RA)],
     #                      [np.sin(DE)]]))  
     
-    
+    # due to the Java Python interface the Vector3D class will create problems if 
+    # the float types are not explicitly cast
     L = Vector3D(float(np.cos(DE) * np.cos(RA)),
                  float(np.cos(DE) * np.sin(RA)),
                  float(np.sin(DE))) 
