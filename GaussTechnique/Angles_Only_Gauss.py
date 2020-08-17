@@ -43,6 +43,7 @@ from java.io import File
 
 # Measurements
 from org.orekit.estimation.measurements import AngularRaDec
+from Orbit_Determination_Python.InitialOrbitDetermination.ObservationTypes import Get_LineOfSight_UnitVector
 
 # Ground stations
 from org.orekit.estimation.measurements import GroundStation
@@ -56,11 +57,13 @@ import csv
 ##############################################################################
 
 
-# Create Earth and Earth Frames
-earthFrame = FramesFactory.getITRF(IERSConventions.IERS_2010, True)
+# Create the GCRF (ECI) and ITRF (ECEF) Frames
+GCRF_Frame = FramesFactory.getGCRF()
+J2000_Frame = FramesFactory.getEME2000()
+ITRF_Frame = FramesFactory.getITRF(IERSConventions.IERS_2010, True)
 earth = OneAxisEllipsoid(Constants.WGS84_EARTH_EQUATORIAL_RADIUS,
                                        Constants.WGS84_EARTH_FLATTENING,
-                                       earthFrame)
+                                       ITRF_Frame)
 
 
 # CREATE THE GROUND STATION
@@ -70,7 +73,7 @@ station_frame = TopocentricFrame(earth, station_coord, 'MyGndStation')
 
 # Now create the Ground station itself and the satellite object
 GndStation = GroundStation(station_frame)
-Sat = ObservableSatellite(1)
+Sat = ObservableSatellite(1) # create the observable satellite object, name it 1 as default
 
 # SET THE DAY OF THE OBSERVATIONS
 yr_mo_day = (2012, 8, 20)
@@ -84,21 +87,28 @@ csv_data = csv.reader(data)
 data_lines = list(csv_data)
 
 # LOOP OVER THE FILE AND CREATE THE OBSERVATION OBJECTS
+# AngularRaDec objects hold Ra and Dec in this order
 utc = TimeScalesFactory.getUTC()
 dates = []
 obs = []
+LOSversors = []
 i = 0
 for line in data_lines[1::]:
-    print(line)
+    
     dates.append(AbsoluteDate(yr_mo_day[0], yr_mo_day[1], yr_mo_day[2],
                               int(line[1]), int(line[2]), float(line[3]), utc))
     
-    obs.append(AngularRaDec(GndStation, earthFrame, dates[i], [radians(float(line[4])), 
+    obs.append(AngularRaDec(GndStation, ITRF_Frame, dates[i], [radians(float(line[4])), 
                                                                radians(float(line[5]))], [0.0, 0.0], [0.0, 0.0], Sat))
+    
+    LOSversors.append(Get_LineOfSight_UnitVector(obs[i].getObservedValue()[0], obs[i].getObservedValue()[1]))
+    
+    
     i += 1
 
 
-
+##############################################################################
+##############################################################################
 
 # GAUSS ORBIT DETERMINATION ROUTINE
 # Here's the actual orbit determination algorithm
@@ -116,8 +126,20 @@ a3 = - tau1 / (tau3 - tau1)
 
 a3_u = - tau1 * ((tau3 - tau1)**2 - tau1**2) / (6*(tau3 - tau1))
 
+# Get the ground station position vector in GCRF (ECI) at each of the observation dates
 
-
+arr = []
+for date in dates:
+    
+    GndStationPos_GCRF = station_frame.getPVCoordinates(date, GCRF_Frame).getPosition()
+    # GndStationPos_J2000 = station_frame.getPVCoordinates(date, J2000_Frame).getPosition()
+    # GndStationPos_ITRF = station_frame.getPVCoordinates(date, ITRF_Frame).getPosition()
+    # print(GndStationPos_ITRF)
+    arr.append([[GndStationPos_GCRF.getX()], [GndStationPos_GCRF.getY()], 
+                                    [GndStationPos_GCRF.getZ()]])
+    
+    
+r_site_GCRF_mat = np.array(arr)
 
 
 
